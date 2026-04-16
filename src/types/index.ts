@@ -47,6 +47,7 @@ export interface AlarmLog {
   completed: boolean;
   challengeType?: ChallengeType;
   challengeDifficulty?: ChallengeDifficulty;
+  durationMs?: number;
   failedAt?: number;
 }
 

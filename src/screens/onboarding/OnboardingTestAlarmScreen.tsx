@@ -223,7 +223,7 @@ export const OnboardingTestAlarmScreen: React.FC<Props> = ({ navigation }) => {
 
       // Navigate to summary after celebration
       setTimeout(() => {
-        navigation.navigate('OnboardingPreview');
+        navigation.replace('OnboardingPreview');
       }, 3500);
     }
   }, [currentSequenceIndex, challengeSequence, navigation]);

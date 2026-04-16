@@ -6,7 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { ProgressBar } from '../../components/onboarding/ProgressBar';
 import { useOnboarding } from '../../context/OnboardingContext';
 import { BUILT_IN_BACKGROUNDS } from '../../constants/backgrounds';
-import { Video, ResizeMode } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -16,11 +16,43 @@ const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.42;
 const CARD_HEIGHT = CARD_WIDTH * 1.75;
 
+// ─── Managed Video Component ──────────────────────────────────────────────
+const OnboardingVideo: React.FC<{ source: any; isSelected: boolean }> = ({ source, isSelected }) => {
+  const player = useVideoPlayer(source, p => {
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={[StyleSheet.absoluteFillObject, { transform: [{ scale: 1.15 }] }]}
+      contentFit="cover"
+      nativeControls={false}
+    />
+  );
+};
+
 export const OnboardingWallpaperScreen: React.FC<Props> = ({ navigation }) => {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { state, updateState } = useOnboarding();
+  const [selectedTab, setSelectedTab] = useState<'video' | 'color'>('video');
   const [activeIndex, setActiveIndex] = useState(0);
+
+  const filteredBackgrounds = BUILT_IN_BACKGROUNDS.filter(bg => bg.type === selectedTab);
+
+  const handleTabChange = (tab: 'video' | 'color') => {
+    setSelectedTab(tab);
+    setActiveIndex(0);
+    // Use setTimeout to ensure the ScrollView has rendered before resetting scroll
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ x: 0, animated: false });
+    }
+  };
+
+  const scrollRef = React.useRef<ScrollView>(null);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const slideSize = CARD_WIDTH + 16;
@@ -48,9 +80,28 @@ export const OnboardingWallpaperScreen: React.FC<Props> = ({ navigation }) => {
         </Text>
       </View>
 
+      {/* Tab Switcher */}
+      <View style={styles.tabContainer}>
+        <View style={[styles.tabBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
+          <TouchableOpacity 
+            style={[styles.tabItem, selectedTab === 'video' && { backgroundColor: isDark ? colors.surfaceHighlight : '#FFFFFF' }]}
+            onPress={() => handleTabChange('video')}
+          >
+            <Text style={[styles.tabText, { color: selectedTab === 'video' ? colors.accent : colors.subtext }]}>Vibes</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tabItem, selectedTab === 'color' && { backgroundColor: isDark ? colors.surfaceHighlight : '#FFFFFF' }]}
+            onPress={() => handleTabChange('color')}
+          >
+            <Text style={[styles.tabText, { color: selectedTab === 'color' ? colors.accent : colors.subtext }]}>Colors</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Carousel */}
       <View style={styles.carouselWrapper}>
         <ScrollView
+          ref={scrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
@@ -60,7 +111,7 @@ export const OnboardingWallpaperScreen: React.FC<Props> = ({ navigation }) => {
           onScroll={handleScroll}
           scrollEventThrottle={16}
         >
-          {BUILT_IN_BACKGROUNDS.map(bg => {
+          {filteredBackgrounds.map(bg => {
             const isSelected = state.backgroundId === bg.id;
             return (
               <TouchableOpacity
@@ -72,18 +123,11 @@ export const OnboardingWallpaperScreen: React.FC<Props> = ({ navigation }) => {
                   { borderColor: isSelected ? colors.accent : 'transparent' },
                 ]}
               >
-                <Video
-                  source={bg.thumbnail}
-                  style={styles.video}
-                  resizeMode={ResizeMode.COVER}
-                  shouldPlay={isSelected}
-                  isLooping
-                  isMuted
-                />
-                {/* Bottom overlay with name */}
-                <View style={styles.cardOverlay}>
-                  <Text style={styles.cardName} numberOfLines={1}>{bg.name ?? 'Theme'}</Text>
-                </View>
+                {bg.type === 'video' ? (
+                  <OnboardingVideo source={bg.source} isSelected={isSelected} />
+                ) : (
+                  <View style={[styles.video, { backgroundColor: bg.color }]} />
+                )}
                 {/* Selected indicator */}
                 {isSelected && (
                   <View style={[styles.selectedBadge, { backgroundColor: colors.accent }]}>
@@ -98,7 +142,7 @@ export const OnboardingWallpaperScreen: React.FC<Props> = ({ navigation }) => {
 
       {/* Pagination Dots */}
       <View style={styles.pagination}>
-        {BUILT_IN_BACKGROUNDS.map((_, index) => (
+        {filteredBackgrounds.map((_, index) => (
           <View
             key={index}
             style={[
@@ -189,6 +233,30 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   footer: { paddingHorizontal: 24 },
+  tabContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    padding: 4,
+    borderRadius: 12,
+    width: '100%',
+    maxWidth: 280,
+  },
+  tabItem: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
   button: {
     height: 60,
     borderRadius: 16,

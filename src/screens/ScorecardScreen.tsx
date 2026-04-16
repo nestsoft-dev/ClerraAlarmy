@@ -39,6 +39,57 @@ export const ScorecardScreen: React.FC = () => {
     return 'The Recruit';
   };
 
+  const getChallengeStats = () => {
+    if (!logs.length) return { mostUsed: '—', record: '—' };
+    
+    const counts: Record<string, number> = {};
+    const records: Record<string, number> = {};
+
+    logs.forEach(log => {
+      if (log.completed && log.challengeType) {
+        counts[log.challengeType] = (counts[log.challengeType] || 0) + 1;
+        if (log.durationMs) {
+          if (!records[log.challengeType] || log.durationMs < records[log.challengeType]) {
+            records[log.challengeType] = log.durationMs;
+          }
+        }
+      }
+    });
+
+    let mostUsedType = '';
+    let maxCount = 0;
+    Object.entries(counts).forEach(([type, count]) => {
+      if (count > maxCount) {
+        maxCount = count;
+        mostUsedType = type;
+      }
+    });
+
+    const CHALLENGE_NAMES: Record<string, string> = {
+      math: 'Math', shake: 'Shake', photo: 'Photo', jump: 'Jump', 
+      brush: 'Brush', pushup: 'Pushup', color: 'Color', unscramble: 'Words',
+      riddle: 'Riddle', memory: 'Memory', quiz: 'Quiz'
+    };
+
+    const mostUsed = CHALLENGE_NAMES[mostUsedType] || '—';
+    const recordMs = records[mostUsedType];
+    const record = recordMs ? `${(recordMs / 1000).toFixed(1)}s` : '—';
+
+    return { mostUsed, record };
+  };
+
+  const { mostUsed, record } = getChallengeStats();
+
+  const getRankIcon = (rank: string) => {
+    switch (rank) {
+      case 'Eternal Awakened': return 'flare';           // Radiance/Transcendence
+      case 'Morning Master': return 'crown-outline';     // Royalty of Routine
+      case 'Discipline Warrior': return 'shield-star-outline'; // Battle Tested
+      case 'Early Bird': return 'weather-sunset-up';     // Dominating the Dawn
+      default: return 'sprout';                          // Rising Growth (Recruit)
+    }
+  };
+
   const getNextRankInfo = () => {
     const streak = stats.currentStreak;
     let nextMilestone = 0;
@@ -115,26 +166,38 @@ export const ScorecardScreen: React.FC = () => {
             <Text style={styles.streakLabel}>Day Streak</Text>
           </LinearGradient>
           
-          <View style={styles.rankBadge}>
-            <Text style={styles.rankLabel}>{getDisciplineRank()}</Text>
-          </View>
-
-          {/* Rank Progression */}
-          {rankInfo && (
-            <View style={styles.progressionArea}>
-              <View style={styles.progressBarBg}>
-                <Animated.View 
-                  style={[
-                    styles.progressBarFill, 
-                    { width: `${rankInfo.progress * 100}%` }
-                  ]} 
+          {/* Rank HUD */}
+          <View style={styles.rankHud}>
+            <View style={styles.rankHeader}>
+              <View style={styles.rankIconContainer}>
+                <MaterialCommunityIcons 
+                  name={getRankIcon(getDisciplineRank()) as any} 
+                  size={20} 
+                  color="#FF7F62" 
                 />
               </View>
-              <Text style={styles.progressionText}>
-                {rankInfo.daysLeft} {rankInfo.daysLeft === 1 ? 'day' : 'days'} until {rankInfo.rankName}
-              </Text>
+              <Text style={styles.rankLabel}>{getDisciplineRank()}</Text>
             </View>
-          )}
+
+            {rankInfo && (
+              <View style={styles.progressionArea}>
+                <View style={styles.progressBarBg}>
+                  <Animated.View 
+                    style={[
+                      styles.progressBarFill, 
+                      { width: `${rankInfo.progress * 100}%` }
+                    ]} 
+                  />
+                </View>
+                <View style={styles.progressionFooter}>
+                  <Text style={styles.progressionText}>
+                    {rankInfo.daysLeft} {rankInfo.daysLeft === 1 ? 'day' : 'days'} until {rankInfo.rankName}
+                  </Text>
+                  <Text style={styles.milestoneText}>{rankInfo.nextMilestone}d</Text>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Consistency Heatmap */}
@@ -202,6 +265,18 @@ export const ScorecardScreen: React.FC = () => {
               label="Challenges" 
               value={stats.totalCompleted * 2} // Estimate 2 per alarm
               color="#5856D6"
+            />
+            <StatCard 
+              icon="star-outline" 
+              label="Favorite" 
+              value={mostUsed} 
+              color="#FF2D55"
+            />
+            <StatCard 
+              icon="timer-outline" 
+              label="Speed Record" 
+              value={record} 
+              color="#007AFF"
             />
           </View>
         </View>
@@ -292,35 +367,68 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     letterSpacing: 1,
   },
   rankLabel: {
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '900',
     color: '#FF7F62',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
-  progressionArea: {
-    marginTop: 24,
+  rankHud: {
+    marginTop: 10,
     width: '100%',
+    backgroundColor: isDark ? 'rgba(255,127,98,0.05)' : 'rgba(255,127,98,0.03)',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(255,127,98,0.1)' : 'rgba(255,127,98,0.08)',
+  },
+  rankHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 20,
+  },
+  rankIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: isDark ? 'rgba(255,127,98,0.15)' : '#FFE5DD',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressionArea: {
+    width: '100%',
   },
   progressBarBg: {
     width: '100%',
-    height: 6,
-    backgroundColor: isDark ? 'rgba(255,127,98,0.1)' : 'rgba(255,127,98,0.05)',
-    borderRadius: 3,
+    height: 10,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+    borderRadius: 5,
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   progressBarFill: {
     height: '100%',
     backgroundColor: '#FF7F62',
-    borderRadius: 3,
+    borderRadius: 5,
+  },
+  progressionFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   progressionText: {
     fontSize: 12,
     fontWeight: '700',
     color: colors.subtext,
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
+  },
+  milestoneText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: colors.accent,
+    opacity: 0.8,
   },
   rankBadge: {
     marginTop: 24,

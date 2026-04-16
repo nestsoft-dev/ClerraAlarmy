@@ -12,7 +12,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingWelcome'>;
 const STATS: { icon: keyof typeof Ionicons.glyphMap; value: string; sub: string }[] = [
   { icon: 'flash',        value: '100K+', sub: 'Wake-ups' },
   { icon: 'trophy',       value: '94%',   sub: 'Success rate' },
-  { icon: 'flame',        value: '30+',   sub: 'Challenges' },
+  { icon: 'flame',        value: '10+',   sub: 'Challenges' },
 ];
 
 export const OnboardingWelcomeScreen: React.FC<Props> = ({ navigation }) => {

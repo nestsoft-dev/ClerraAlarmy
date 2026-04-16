@@ -15,7 +15,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     strictMode: true,
     adaptiveDifficulty: true,
     maxVolumeOverride: true,
-    gracePeriod: 5,
+    gracePeriod: 0,
     defaultSoundId: 'radar', // fallback, updated in useEffect
     isPremium: false,
     preAlarmReminder: 5,

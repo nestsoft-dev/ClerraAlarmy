@@ -70,8 +70,8 @@ export const PushupChallenge: React.FC<PushupChallengeProps> = ({ difficulty, on
   const SETUP_STEPS = [
     { step: '1', text: 'Place your phone face-up on the floor' },
     { step: '2', text: 'Get into push-up position above it' },
-    { step: '3', text: 'Lower until your chest nearly touches the screen' },
-    { step: '4', text: "Push back up that's one rep!" },
+    { step: '3', text: 'Lower your nose till it touches the surface of your phone' },
+    { step: '4', text: "Push back up — that's one rep!" },
   ];
 
   if (!permission) {

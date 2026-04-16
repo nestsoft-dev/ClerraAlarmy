@@ -8,10 +8,15 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { OnboardingProvider } from './src/context/OnboardingContext';
 import { SettingsProvider } from './src/context/SettingsContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import { Asset } from 'expo-asset';
 import { NavigationContainerRef } from '@react-navigation/native';
 import { RootStackParamList } from './src/navigation/AppNavigator';
+import { SOUND_ASSETS } from './src/constants/sounds';
+import { Audio } from 'expo-av';
+import { BUILT_IN_BACKGROUNDS } from './src/constants/backgrounds';
+import * as Font from 'expo-font';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -56,7 +61,7 @@ const AppContent: React.FC<{ onReady: () => void }> = ({ onReady }) => {
       startChallenge(1, alarmId);
       setTimeout(() => {
         navigationRef.current?.navigate('AlarmRing', { alarmId });
-      }, 500); 
+      }, 50); 
     };
 
     const checkActiveNotifications = async () => {
@@ -140,12 +145,31 @@ export default function App() {
         const delayPromise = new Promise(resolve => setTimeout(resolve, 2000));
         
         // Pre-load essential assets
-        const assetPromise = Asset.loadAsync([
+        const essentialImages = [
           require('./assets/ClerraAlarm Light1.png'),
-        ]);
+        ];
 
-        await Promise.all([delayPromise, assetPromise]);
-        console.log('DEBUG: Assets Preloaded and Min Delay Finished.');
+        const sounds = Object.values(SOUND_ASSETS);
+        const backgrounds = BUILT_IN_BACKGROUNDS.flatMap(bg => {
+          const assets = [];
+          if (bg.source) assets.push(bg.source);
+          if (bg.thumbnail) assets.push(bg.thumbnail);
+          return assets;
+        });
+
+        const assetPromise = Asset.loadAsync([...essentialImages, ...sounds, ...backgrounds]);
+        const fontPromise = Font.loadAsync({
+          ...Ionicons.font,
+        });
+
+        const audioModePromise = Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: true,
+          shouldDuckAndroid: false,
+        });
+
+        await Promise.all([delayPromise, assetPromise, fontPromise, audioModePromise]);
+        console.log('DEBUG: All Assets & Fonts Preloaded.');
       } catch (e) {
         console.warn('DEBUG: Boot Error', e);
       } finally {

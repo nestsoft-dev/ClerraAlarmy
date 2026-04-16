@@ -77,10 +77,7 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({ selectedId, onSelect }
     await stopPreview();
     setPreviewingId(id);
     try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-      });
+      // Audio mode configured globally in App.tsx
       const asset = SOUND_ASSETS[id];
       if (!asset) return;
       const { sound } = await Audio.Sound.createAsync(asset, { volume: 0.8 });

@@ -82,7 +82,7 @@ export const SettingsScreen: React.FC = () => {
       'Grace Period',
       'Seconds before alarm sound and discipline kick in.',
       [
-        { text: '0 Sec', onPress: () => updateSettings({ gracePeriod: 0 }) },
+        { text: '0 Sec (Instant)', onPress: () => updateSettings({ gracePeriod: 0 }) },
         { text: '5 Sec', onPress: () => updateSettings({ gracePeriod: 5 }) },
         { text: '10 Sec', onPress: () => updateSettings({ gracePeriod: 10 }) },
         { text: '15 Sec', onPress: () => updateSettings({ gracePeriod: 15 }) },
@@ -122,11 +122,29 @@ export const SettingsScreen: React.FC = () => {
   const handleSignOut = () => {
     Alert.alert(
       'Sign Out',
-      'Are you sure? This will clear all local data.',
+      'Are you sure? This will clear all local data from this device.',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Sign Out', 
+          style: 'destructive', 
+          onPress: async () => {
+            await Storage.clearAllData();
+            navigation.reset({ index: 0, routes: [{ name: 'OnboardingWelcome' }] });
+          } 
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account?',
+      'This action is permanent. All your alarms, history, and Pro settings will be permanently removed. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete Permanently', 
           style: 'destructive', 
           onPress: async () => {
             await Storage.clearAllData();
@@ -174,8 +192,8 @@ export const SettingsScreen: React.FC = () => {
               <View style={styles.promoBadge}>
                 <Text style={styles.promoBadgeText}>LIMITED TIME</Text>
               </View>
-              <Text style={styles.promoTitle}>Mega Deal — 85% OFF</Text>
-              <Text style={styles.promoSub}>Only $0.59/week (billed yearly)</Text>
+              <Text style={styles.promoTitle}>Mega Deal — 76% OFF</Text>
+              <Text style={styles.promoSub}>Only $0.69/week (billed yearly)</Text>
             </View>
             <Ionicons name="gift" size={42} color="rgba(255,255,255,0.4)" style={styles.promoIcon} />
             <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
@@ -294,6 +312,24 @@ export const SettingsScreen: React.FC = () => {
         </View>
 
 
+
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>ACCOUNT MANAGEMENT</Text>
+          <View style={styles.card}>
+            <SettingsItem 
+              icon="log-out-outline" 
+              title="Sign Out" 
+              onPress={handleSignOut} 
+            />
+            <View style={styles.divider} />
+            <SettingsItem 
+              icon="trash-outline" 
+              title="Delete Account" 
+              isDestructive
+              onPress={handleDeleteAccount} 
+            />
+          </View>
+        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionHeader}>DEVELOPER TOOLS</Text>

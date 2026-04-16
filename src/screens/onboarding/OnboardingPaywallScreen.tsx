@@ -8,6 +8,7 @@ import {
   Platform,
   Alert,
   Image,
+  Animated,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -23,6 +24,59 @@ import { LinearGradient } from 'expo-linear-gradient';
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingPaywall'>;
 
 type SubscriptionPlan = 'weekly' | 'yearly';
+
+const REVIEWS = [
+  { id: '1', name: 'James T.', text: 'Finally a wake up app that actually works. The push-up challenge is brutal but effective!', rating: 5 },
+  { id: '2', name: 'Sarah K.', text: 'Love the cinematic wallpapers. Makes waking up feel like a movie.', rating: 5 },
+  { id: '3', name: 'Mike R.', text: 'The math problems really wake my brain up. Best $50 I ever spent.', rating: 5 },
+  { id: '4', name: 'Elena G.', text: 'Never slept through an alarm since I got Clerra. The volume enforcement is no joke.', rating: 5 },
+  { id: '5', name: 'David L.', text: 'Highest quality alarm app on the store. Worth every penny.', rating: 5 },
+  { id: '6', name: 'Chloe M.', text: 'The color matching challenge is so creative! 10/10 design.', rating: 5 },
+  { id: '7', name: 'Robert H.', text: 'Strict mode saved my career. No more oversleeping.', rating: 5 },
+  { id: '8', name: 'Jessica B.', text: 'Clean, beautiful, and impossible to snooze.', rating: 5 },
+  { id: '9', name: 'Thomas W.', text: 'The weekly streak feature keeps me motivated.', rating: 5 },
+  { id: '10', name: 'Anna P.', text: 'Genuinely premium experience. The audio quality is incredible.', rating: 5 },
+];
+
+const ReviewsSection = () => {
+  const { colors, isDark } = useTheme();
+  // Double the list for seamless loop
+  const doubledReviews = [...REVIEWS, ...REVIEWS];
+  const scrollX = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    const animation = Animated.loop(
+      Animated.timing(scrollX, {
+        toValue: -296 * REVIEWS.length,
+        duration: 40000,
+        easing: (t) => t, // Linear
+        useNativeDriver: true,
+      })
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [scrollX]);
+
+  return (
+    <View style={styles.reviewsWrapper}>
+      <Animated.View style={[styles.reviewsTrack, { transform: [{ translateX: scrollX }] }]}>
+        {doubledReviews.map((rev, idx) => (
+          <View key={`${rev.id}-${idx}`} style={[styles.reviewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.reviewHeader}>
+              <View style={styles.stars}>
+                {[...Array(5)].map((_, i) => (
+                  <Ionicons key={i} name="star" size={12} color="#FF7F62" />
+                ))}
+              </View>
+              <Text style={[styles.reviewName, { color: colors.text }]}>{rev.name}</Text>
+            </View>
+            <Text style={[styles.reviewText, { color: colors.subtext }]} numberOfLines={3}>{rev.text}</Text>
+          </View>
+        ))}
+      </Animated.View>
+    </View>
+  );
+};
 
 export const OnboardingPaywallScreen: React.FC<Props> = ({ navigation }) => {
   const { colors, isDark } = useTheme();
@@ -123,7 +177,7 @@ export const OnboardingPaywallScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView 
-        contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
@@ -136,14 +190,12 @@ export const OnboardingPaywallScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={[styles.title, { color: colors.text }]}>
             Master your morning.{'\n'}Master your life.
           </Text>
-          <Text style={[styles.subTitle, { color: colors.subtext }]}>
-            Join 10,000+ people using ClerraAlarm to build{'\n'}unbreakable discipline.
-          </Text>
         </View>
 
         {/* Benefits */}
         <View style={styles.benefits}>
           <Benefit icon="flame" text="Unlimited adaptive missions" />
+          <Benefit icon="fitness" text="Work out to dismiss alarm" />
           <Benefit icon="volume-high" text="Hardcore volume enforcement" />
           <Benefit icon="musical-notes" text="Full wake-up sound library" />
           <Benefit icon="stats-chart" text="Advanced discipline analytics" />
@@ -154,15 +206,15 @@ export const OnboardingPaywallScreen: React.FC<Props> = ({ navigation }) => {
           <PlanOption 
             type="yearly"
             title="Yearly Access"
-            price="$0.99"
+            price="$0.69"
             period="week"
-            badge="SAVE 75%"
+            badge="SAVE 76%"
           />
 
           <PlanOption 
             type="weekly"
             title="Weekly Access"
-            price="$3.99"
+            price="$2.99"
             period="week"
           />
         </View>
@@ -171,9 +223,12 @@ export const OnboardingPaywallScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.trialNote}>
           <Ionicons name="shield-checkmark" size={16} color={colors.subtext} style={{ marginRight: 6 }} />
           <Text style={[styles.trialNoteText, { color: colors.subtext }]}>
-            3 days free, then {selectedPlan === 'yearly' ? '$49.99/year' : '$3.99/week'}. Cancel anytime.
+            {selectedPlan === 'yearly' ? '3 days free, then $36.99/year. Cancel anytime.' : '$2.99/week. Cancel anytime.'}
           </Text>
         </View>
+
+        {/* Dynamic Reviews Section */}
+        <ReviewsSection />
 
 
       </ScrollView>
@@ -189,7 +244,9 @@ export const OnboardingPaywallScreen: React.FC<Props> = ({ navigation }) => {
           {loading ? (
             <Text style={styles.mainButtonText}>Processing...</Text>
           ) : (
-            <Text style={styles.mainButtonText}>Start 3-Day Free Trial</Text>
+            <Text style={styles.mainButtonText}>
+              {selectedPlan === 'yearly' ? 'Start 3-Day Free Trial' : 'Continue'}
+            </Text>
           )}
         </TouchableOpacity>
 
@@ -254,7 +311,7 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
     textAlign: 'center',
     lineHeight: 38,
-    marginBottom: 14,
+    marginBottom: 8,
   },
   subTitle: {
     fontSize: 16,
@@ -264,7 +321,7 @@ const styles = StyleSheet.create({
   },
   benefits: {
     paddingHorizontal: 32,
-    marginBottom: 40,
+    marginBottom: 28,
   },
   benefitRow: {
     flexDirection: 'row',
@@ -409,5 +466,45 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginHorizontal: 12,
     letterSpacing: 1,
+  },
+  reviewsWrapper: {
+    marginTop: 32,
+    marginBottom: 20,
+    overflow: 'hidden',
+  },
+  reviewsTrack: {
+    flexDirection: 'row',
+    gap: 16,
+    paddingHorizontal: 24,
+  },
+  reviewCard: {
+    width: 280,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  stars: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  reviewName: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  reviewText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontStyle: 'italic',
   },
 });

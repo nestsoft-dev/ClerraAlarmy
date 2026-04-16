@@ -19,6 +19,53 @@ type Option = { icon: keyof typeof Ionicons.glyphMap; text: string };
 
 const QUESTIONS: { question: string; sub?: string; options: Option[] }[] = [
   {
+    question: "Every morning is a choice. How much of your life is lost to the snooze button?",
+    options: [
+      { icon: 'time-outline', text: '1-3 Years' },
+      { icon: 'hourglass-outline', text: '5+ Years' },
+      { icon: 'alert-circle-outline', text: 'I am afraid to count' },
+    ],
+  },
+  {
+    question: "When you hit snooze, who are you becoming?",
+    options: [
+      { icon: 'bed-outline', text: 'A dreamer who never wakes' },
+      { icon: 'trending-down-outline', text: 'Someone who settles' },
+      { icon: 'people-outline', text: 'Just another follower' },
+    ],
+  },
+  {
+    question: "What is the true price of another hour in bed?",
+    options: [
+      { icon: 'shield-outline', text: 'My self-respect' },
+      { icon: 'battery-dead-outline', text: 'My momentum' },
+      { icon: 'close-circle-outline', text: 'My biggest goals' },
+    ],
+  },
+  {
+    question: "Imagine the person you were meant to be. Are they still asleep?",
+    options: [
+      { icon: 'eye-outline', text: 'Yes, and I am done with it' },
+      { icon: 'help-circle-outline', text: 'I need to find out' },
+      { icon: 'sunny-outline', text: 'Not anymore' },
+    ],
+  },
+  {
+    question: "If nothing changes today, will you be proud in five years?",
+    options: [
+      { icon: 'warning-outline', text: 'No, I need change now' },
+      { icon: 'navigate-outline', text: 'I refuse to stay here' },
+      { icon: 'sparkles-outline', text: 'I am ready to transform' },
+    ],
+  },
+  {
+    question: "Waking up is an act of war against mediocrity. Are you ready?",
+    options: [
+      { icon: 'flash-outline', text: 'I am ready' },
+      { icon: 'flame-outline', text: "Let's go" },
+    ],
+  },
+  {
     question: 'How hard is it to wake up?',
     options: [
       { icon: 'checkmark-circle', text: 'Usually fine' },
@@ -188,7 +235,7 @@ export const OnboardingQuestionsScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-      <ProgressBar progress={(currentStep + 1) / 7} onBack={goBack} />
+      <ProgressBar progress={(currentStep + 1) / (QUESTIONS.length + 3)} onBack={goBack} />
 
       <View style={styles.inner}>
         <Animated.View

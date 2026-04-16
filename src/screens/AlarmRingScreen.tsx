@@ -7,6 +7,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Audio } from 'expo-av';
+import { Asset } from 'expo-asset';
 import { useAlarm } from '../context/AlarmContext';
 import { useTheme } from '../context/ThemeContext';
 import { useSettings } from '../context/SettingsContext';
@@ -106,11 +107,14 @@ export const AlarmRingScreen: React.FC = () => {
     const sub = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active' && hasBooted.current) {
         // Returned from background — ensure sound is still playing
-        startAlarmSound();
+        // We use a light-weight check
+        resumeAlarmSound();
       }
     });
     return () => sub.remove();
   }, []);
+
+  // Audio mode is now handled globally in App.tsx boot sequence
 
   // ─── Boot sequence ────────────────────────────────────────────────────────
   const hasBooted = useRef(false);
@@ -119,10 +123,11 @@ export const AlarmRingScreen: React.FC = () => {
     setCurrentAlarm(alarmId);
     if (!hasBooted.current) {
       hasBooted.current = true;
+      // Start loading immediately in the background
+      preloadAlarmSound();
       bootAlarm();
     } else {
-      // App returned from background — restart sound only, don't touch phase
-      startAlarmSound();
+      resumeAlarmSound();
     }
   }, [alarmId]);
 
@@ -168,13 +173,14 @@ export const AlarmRingScreen: React.FC = () => {
   const bootAlarm = async () => {
     if (settings.gracePeriod > 0) {
       // Wait for the grace period before starting sound
-      setTimeout(async () => {
-        // Double check we haven't already finished or moved to challenge in a way that should stop sound
-        if (hasBooted.current && phase !== 'success') {
-          await startAlarmSound();
-        }
-      }, settings.gracePeriod * 1000);
+      await new Promise(resolve => setTimeout(resolve, settings.gracePeriod * 1000));
+      
+      // Double check we haven't already finished or moved to challenge
+      if (hasBooted.current && phase !== 'success') {
+        await startAlarmSound();
+      }
     } else {
+      // Immediately start or wait for in-flight loading
       await startAlarmSound();
     }
   };
@@ -191,33 +197,84 @@ export const AlarmRingScreen: React.FC = () => {
   const volumeEnforcerRef = useRef<NodeJS.Timeout | null>(null);
 
   // ─── Sound ────────────────────────────────────────────────────────────────
+  const isSoundLoading = useRef(false);
+  const soundLoadingPromise = useRef<Promise<void> | null>(null);
+
+  const preloadAlarmSound = async () => {
+    if (soundRef.current || isSoundLoading.current) return;
+    
+    isSoundLoading.current = true;
+    soundLoadingPromise.current = (async () => {
+      try {
+        const soundId = alarm?.soundId ?? DEFAULT_SOUND_ID;
+        const asset = SOUND_ASSETS[soundId] ?? SOUND_ASSETS[DEFAULT_SOUND_ID];
+        
+        // Ensure asset is actually cached/ready
+        await Asset.fromModule(asset).downloadAsync();
+        
+        const { sound } = await Audio.Sound.createAsync(
+          asset, 
+          { 
+            isLooping: true, 
+            volume: 1.0, 
+            shouldPlay: settings.gracePeriod === 0 // If no grace period, play as soon as loaded
+          }
+        );
+        soundRef.current = sound;
+      } catch (err) {
+        console.warn('Failed to preload sound:', err);
+      } finally {
+        isSoundLoading.current = false;
+      }
+    })();
+    return soundLoadingPromise.current;
+  };
+
   const startAlarmSound = async () => {
     try {
-      await stopAlarmSound();
-      
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: false,
-      });
-      const soundId = alarm?.soundId ?? DEFAULT_SOUND_ID;
-      const asset = SOUND_ASSETS[soundId] ?? SOUND_ASSETS[DEFAULT_SOUND_ID];
-      const { sound } = await Audio.Sound.createAsync(asset, {
-        isLooping: true, volume: 1.0, shouldPlay: true,
-      });
-      soundRef.current = sound;
-      volumeRef.current = 1.0;
+      // 1. Wait for preloading to finish if it's already in flight
+      if (soundLoadingPromise.current) {
+        await soundLoadingPromise.current;
+      }
 
-      // Aggressive volume enforcer loop
-      volumeEnforcerRef.current = setInterval(async () => {
-        if (soundRef.current && settings.maxVolumeOverride && volumeRef.current < 1.0) {
+      // 2. If it failed or wasn't kicked off, try one last time
+      if (!soundRef.current) {
+        await preloadAlarmSound();
+        if (soundLoadingPromise.current) await soundLoadingPromise.current;
+      }
+
+      // 3. Play if we have a sound and it's not already playing (it might be playing if shouldPlay was true in createAsync)
+      if (soundRef.current) {
+        const status = await soundRef.current.getStatusAsync();
+        if (status.isLoaded && !status.isPlaying) {
+          await soundRef.current.setStatusAsync({ shouldPlay: true, volume: 1.0 });
           volumeRef.current = 1.0;
-          try { await soundRef.current.setVolumeAsync(1.0); } catch {}
         }
-      }, 500);
 
+        // Restart volume enforcer
+        if (volumeEnforcerRef.current) clearInterval(volumeEnforcerRef.current);
+        volumeEnforcerRef.current = setInterval(async () => {
+          if (soundRef.current && settings.maxVolumeOverride && volumeRef.current < 1.0) {
+            volumeRef.current = 1.0;
+            try { await soundRef.current.setVolumeAsync(1.0); } catch {}
+          }
+        }, 500);
+      }
     } catch (err) {
-      console.warn('Failed to start alarm sound:', err);
+      console.warn('Failed to play alarm sound:', err);
+    }
+  };
+
+  const resumeAlarmSound = async () => {
+    if (soundRef.current) {
+      try {
+        const status = await soundRef.current.getStatusAsync();
+        if (status.isLoaded && !status.isPlaying) {
+          await soundRef.current.playAsync();
+        }
+      } catch {}
+    } else {
+      startAlarmSound();
     }
   };
 

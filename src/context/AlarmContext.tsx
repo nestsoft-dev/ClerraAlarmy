@@ -45,6 +45,7 @@ export const AlarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [failCount, setFailCount] = useState(0);
   const [challengeSequence, setChallengeSequence] = useState<Challenge[]>([]);
   const [currentSequenceIndex, setCurrentSequenceIndex] = useState(0);
+  const [challengeStartTime, setChallengeStartTime] = useState<number | null>(null);
   const { settings } = useSettings();
 
   const loadAlarms = useCallback(async () => {
@@ -216,6 +217,7 @@ export const AlarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
     
     setFailCount(0);
+    setChallengeStartTime(Date.now());
   }, [alarms, currentAlarmId]);
 
   const completeChallenge = useCallback(async (): Promise<boolean> => {
@@ -241,6 +243,7 @@ export const AlarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         completed: true,
         challengeType: currentChallenge?.type,
         challengeDifficulty: currentDifficulty as 1|2|3,
+        durationMs: challengeStartTime ? Date.now() - challengeStartTime : undefined,
       });
 
       await refreshStats();
@@ -259,6 +262,7 @@ export const AlarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setChallengeSequence([]);
     setCurrentSequenceIndex(0);
     setFailCount(0);
+    setChallengeStartTime(null);
     return true; // Sequence fully complete
   }, [currentSequenceIndex, challengeSequence, currentDifficulty, currentAlarmId, alarms, refreshStats, loadAlarms]);
 
@@ -304,6 +308,7 @@ export const AlarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setCurrentSequenceIndex(0);
     setFailCount(0);
     setCurrentDifficulty(1);
+    setChallengeStartTime(null);
   }, []);
 
   return (

@@ -26,6 +26,7 @@ interface BackgroundPickerProps {
 const VideoTile: React.FC<{ bg: AlarmBackground; isSelected: boolean; onPress: () => void }> = ({
   bg, isSelected, onPress,
 }) => {
+  // Enable playback for all tiles to create a dynamic, "alive" grid experience
   const player = useVideoPlayer(bg.source, p => {
     p.loop = true;
     p.muted = true;
@@ -105,6 +106,7 @@ const HeaderPreview: React.FC<{ bg: AlarmBackground }> = ({ bg }) => {
     );
   }
 
+  // Ensure this player is managed and played
   const player = useVideoPlayer(bg.source, p => {
     p.loop = true;
     p.muted = true;
@@ -132,7 +134,7 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
 
   const selectedBuiltIn = BUILT_IN_BACKGROUNDS.find(b => b.id === selectedId);
 
-  let currentLabel = 'Default Vibe';
+  let currentLabel = 'Default Wallpaper';
   if (selectedUri) {
     currentLabel = 'Custom Video';
   } else if (selectedBuiltIn) {

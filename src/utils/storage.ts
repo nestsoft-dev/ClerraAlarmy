@@ -150,7 +150,7 @@ export const Storage = {
       adaptiveDifficulty: true,
 
       maxVolumeOverride: true,
-      gracePeriod: 5,
+      gracePeriod: 0,
       defaultSoundId: DEFAULT_SOUND_ID,
       isPremium: false,
       preAlarmReminder: 5,

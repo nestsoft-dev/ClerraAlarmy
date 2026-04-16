@@ -43,7 +43,7 @@ export const SpecialOfferScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.header}>
           <Text style={styles.oneTimeOffer}>One-time Offer</Text>
           <Text style={styles.discountText}>
-            85% OFF
+            76% OFF
           </Text>
           <Text style={styles.subtext}>
             This offer won't be there once{'\n'}you close it!
@@ -54,7 +54,7 @@ export const SpecialOfferScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.bubbleContainer}>
           <View style={styles.bubble}>
             <Text style={styles.bubblePrice}>
-              Only <Text style={{ fontWeight: '900' }}>$0.59/week</Text>
+              Only <Text style={{ fontWeight: '900' }}>$0.69/week</Text>
             </Text>
             <Text style={styles.bubbleContext}>*Lowest price ever</Text>
           </View>
@@ -88,7 +88,7 @@ export const SpecialOfferScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.noThanksText}>No Thanks</Text>
         </TouchableOpacity>
 
-        <Text style={styles.billingNote}>billed yearly at $29.99 per year</Text>
+        <Text style={styles.billingNote}>billed yearly at $36.99 per year</Text>
       </View>
     </View>
   );
