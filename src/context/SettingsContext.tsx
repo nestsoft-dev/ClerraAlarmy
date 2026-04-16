@@ -6,20 +6,23 @@ interface SettingsContextType {
   settings: AppSettings;
   updateSettings: (changes: Partial<AppSettings>) => Promise<void>;
   isLoading: boolean;
+  resetContext: () => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
+const DEFAULT_SETTINGS: AppSettings = {
+  strictMode: true,
+  adaptiveDifficulty: true,
+  gracePeriod: 0,
+  defaultSoundId: 'radar',
+  isPremium: false,
+  subscriptionPlan: undefined,
+  preAlarmReminder: 5,
+};
+
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [settings, setSettings] = useState<AppSettings>({
-    strictMode: true,
-    adaptiveDifficulty: true,
-    maxVolumeOverride: true,
-    gracePeriod: 0,
-    defaultSoundId: 'radar', // fallback, updated in useEffect
-    isPremium: false,
-    preAlarmReminder: 5,
-  });
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -45,8 +48,12 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
+  const resetContext = () => {
+    setSettings(DEFAULT_SETTINGS);
+  };
+
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings, isLoading }}>
+    <SettingsContext.Provider value={{ settings, updateSettings, isLoading, resetContext }}>
       {children}
     </SettingsContext.Provider>
   );

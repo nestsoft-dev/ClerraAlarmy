@@ -12,7 +12,20 @@ export const cancelAlarmNotifications = async (alarm: Alarm): Promise<void> => {
   for (const nid of alarm.notificationIds) {
     try {
       await Notifications.cancelScheduledNotificationAsync(nid);
-    } catch {}
+    } catch (e) {
+      console.error('[Notification] Failed to cancel notification', e);
+    }
+  }
+};
+/**
+ * Cancels ALL scheduled notifications for the entire app.
+ * Use this for app resets.
+ */
+export const cancelAllLocalNotifications = async (): Promise<void> => {
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  } catch (e) {
+    console.error('[Notification] Failed to cancel all notifications', e);
   }
 };
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Vibration,
-  Alert, BackHandler, Animated, StatusBar, SafeAreaView, AppState,
+  Alert, BackHandler, Animated, StatusBar, SafeAreaView, AppState, Image,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -67,7 +67,6 @@ export const OnboardingTestAlarmScreen: React.FC<Props> = ({ navigation }) => {
   const [currentDifficulty, setCurrentDifficulty] = useState(1);
 
   const soundRef = useRef<Audio.Sound | null>(null);
-  const volumeRef = useRef(1.0);
 
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -188,7 +187,6 @@ export const OnboardingTestAlarmScreen: React.FC<Props> = ({ navigation }) => {
         isLooping: true, volume: 1.0, shouldPlay: true,
       });
       soundRef.current = sound;
-      volumeRef.current = 1.0;
     } catch (err) {
       console.warn('Failed to start alarm sound:', err);
     }
@@ -325,6 +323,8 @@ export const OnboardingTestAlarmScreen: React.FC<Props> = ({ navigation }) => {
       : undefined;
 
     const hasBg = !!builtIn || !!alarm?.backgroundUri;
+    const isVideo = !!alarm?.backgroundUri || (builtIn && builtIn.type === 'video');
+    const showBranding = !isVideo;
     const textColor = hasBg ? '#FFFFFF' : colors.text;
     const subtextColor = hasBg ? 'rgba(255,255,255,0.8)' : colors.subtext;
 
@@ -346,6 +346,18 @@ export const OnboardingTestAlarmScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={[styles.introDate, { color: subtextColor }]}>{dateString}</Text>
             <Text style={[styles.introLabel, { color: textColor }]}>{alarm?.label || 'Wake Up!'}</Text>
           </Animated.View>
+
+          {/* Branding (Center) - Only show if not video */}
+          {showBranding && (
+            <Animated.View style={[styles.brandingContainer, { opacity: textFadeAnim }]}>
+              <Image 
+                source={require('../../../assets/ClerraAlarm Light1.png')} 
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+              <Text style={[styles.logoText, { color: textColor }]}>ClerraAlarm</Text>
+            </Animated.View>
+          )}
 
           <Animated.View style={{ opacity: textFadeAnim }}>
             <TouchableOpacity style={styles.startChallengeBtn} onPress={handleStartChallenge} activeOpacity={0.8}>
@@ -438,6 +450,20 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: 0.2,
+  },
+  brandingContainer: {
+    alignItems: 'center',
+    gap: 8,
+    marginTop: -40,
+  },
+  logoImage: {
+    width: 100,
+    height: 100,
+  },
+  logoText: {
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: -1,
   },
   challengeHeader: {
     paddingTop: 16,

@@ -101,7 +101,11 @@ export const OnboardingPaywallScreen: React.FC<Props> = ({ navigation }) => {
 
       // 1. Logically "Subscribe" (Mock)
       const settings = await Storage.getSettings();
-      await Storage.updateSettings({ ...settings, isPremium: true });
+      await Storage.updateSettings({ 
+        ...settings, 
+        isPremium: true,
+        subscriptionPlan: selectedPlan 
+      });
 
       // 2. Build and save the first alarm
       const newAlarm = buildAlarm();

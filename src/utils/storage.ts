@@ -9,6 +9,7 @@ const KEYS = {
   STATS: '@clerra_stats',
   ONBOARDING: '@clerra_onboarding_completed',
   SETTINGS: '@clerra_settings',
+  THEME_MODE: '@clerra_theme_mode',
 };
 
 export const Storage = {
@@ -148,11 +149,10 @@ export const Storage = {
     const defaults: AppSettings = {
       strictMode: true,
       adaptiveDifficulty: true,
-
-      maxVolumeOverride: true,
       gracePeriod: 0,
       defaultSoundId: DEFAULT_SOUND_ID,
       isPremium: false,
+      subscriptionPlan: undefined,
       preAlarmReminder: 5,
       hasPromptedForReview: false,
     };

@@ -26,6 +26,7 @@ interface AlarmContextType {
   resetChallenge: () => void;
   refreshStats: () => Promise<void>;
   syncScheduledNotifications: () => Promise<void>;
+  resetContext: () => void;
 }
 
 const AlarmContext = createContext<AlarmContextType | undefined>(undefined);
@@ -122,7 +123,7 @@ export const AlarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const addAlarm = useCallback(async (alarmData: Omit<Alarm, 'id' | 'createdAt'> | Alarm) => {
     // Support pre-generated IDs (when notification ID was embedded before save)
-    const alarm: Alarm = 'id' in alarmData && alarmData.id
+    let alarm: Alarm = 'id' in alarmData && alarmData.id
       ? (alarmData as Alarm)
       : {
           ...alarmData,
@@ -130,7 +131,17 @@ export const AlarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           volume: (alarmData as any).volume ?? 1.0,
           id: generateId(),
           createdAt: Date.now(),
-        };
+        } as Alarm;
+
+    // CRITICAL: If the alarm is enabled but has no notifications scheduled yet, schedule them.
+    // This fixes the bug where onboarding alarms (which calls addAlarm without scheduling) 
+    // wouldn't ring until toggled off and back on.
+    if (alarm.enabled && (!alarm.notificationIds || alarm.notificationIds.length === 0)) {
+      console.log(`[AlarmContext] Scheduling notifications for new alarm ${alarm.id}`);
+      const notificationIds = await scheduleAlarmNotifications(alarm);
+      alarm = { ...alarm, notificationIds };
+    }
+
     await Storage.addAlarm(alarm);
     await loadAlarms();
   }, [loadAlarms]);
@@ -309,7 +320,19 @@ export const AlarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setFailCount(0);
     setCurrentDifficulty(1);
     setChallengeStartTime(null);
-  }, []);
+  }, [setCurrentAlarmId, setCurrentChallenge, setChallengeSequence, setCurrentSequenceIndex, setFailCount, setCurrentDifficulty, setChallengeStartTime]);
+
+  const resetContext = useCallback(() => {
+    setAlarms([]);
+    setStats({
+      currentStreak: 0,
+      longestStreak: 0,
+      totalAlarms: 0,
+      totalCompleted: 0,
+      totalFailed: 0,
+    });
+    resetChallenge();
+  }, [resetChallenge]);
 
   return (
     <AlarmContext.Provider
@@ -333,6 +356,7 @@ export const AlarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         resetChallenge,
         refreshStats,
         syncScheduledNotifications,
+        resetContext,
       }}
     >
       {children}

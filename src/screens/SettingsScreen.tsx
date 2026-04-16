@@ -10,11 +10,14 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { Storage } from '../utils/storage';
 import { ALARM_SOUNDS } from '../constants/sounds';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAlarm } from '../context/AlarmContext';
+import { cancelAllLocalNotifications } from '../utils/notificationScheduler';
 
 export const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { colors, isDark, mode, setMode } = useTheme();
-  const { settings, updateSettings } = useSettings();
+  const { mode, setMode, isDark, colors } = useTheme();
+  const { settings, updateSettings, resetContext: resetSettingsContext } = useSettings();
+  const { resetContext: resetAlarmContext } = useAlarm();
   
   const styles = getStyles(colors, isDark);
 
@@ -119,36 +122,46 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
-  const handleSignOut = () => {
+  const handleResetAllData = () => {
     Alert.alert(
-      'Sign Out',
-      'Are you sure? This will clear all local data from this device.',
+      'Reset All Data?',
+      'This will permanently delete all your alarms, history, streaks, and settings. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
-          text: 'Sign Out', 
+          text: 'Reset Everything', 
           style: 'destructive', 
-          onPress: async () => {
-            await Storage.clearAllData();
-            navigation.reset({ index: 0, routes: [{ name: 'OnboardingWelcome' }] });
-          } 
-        },
-      ]
-    );
-  };
-
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account?',
-      'This action is permanent. All your alarms, history, and Pro settings will be permanently removed. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete Permanently', 
-          style: 'destructive', 
-          onPress: async () => {
-            await Storage.clearAllData();
-            navigation.reset({ index: 0, routes: [{ name: 'OnboardingWelcome' }] });
+          onPress: () => {
+            // Double confirmation for such a destructive action
+            Alert.alert(
+              'Are you absolutely sure?',
+              'All progress will be lost forever.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Yes, Wipe Everything',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      // 1. Cancel all OS notifications
+                      await cancelAllLocalNotifications();
+                      // 2. Clear AsyncStorage
+                      await Storage.clearAllData();
+                      // 3. Reset in-memory contexts
+                      resetAlarmContext();
+                      resetSettingsContext();
+                      // 4. Force reset to onboarding
+                      navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'OnboardingWelcome' }],
+                      });
+                    } catch (e) {
+                      Alert.alert('Error', 'Failed to reset all data. Please try again.');
+                    }
+                  }
+                }
+              ]
+            );
           } 
         },
       ]
@@ -176,29 +189,37 @@ export const SettingsScreen: React.FC = () => {
 
       <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
         
-        {/* ── Special Offer ────────────────────────────────────────── */}
-        <TouchableOpacity 
-          style={styles.promoCard} 
-          onPress={() => navigation.navigate('SpecialOffer')}
-          activeOpacity={0.9}
-        >
-          <LinearGradient
-            colors={['#FF7F27', '#FF9F43']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.promoGradient}
-          >
-            <View style={styles.promoLeft}>
-              <View style={styles.promoBadge}>
-                <Text style={styles.promoBadgeText}>LIMITED TIME</Text>
+        {/* ── Subscription ─────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>SUBSCRIPTION</Text>
+          <View style={styles.card}>
+            <View style={styles.subscriptionItem}>
+              <View style={styles.subscriptionLeft}>
+                <View style={[styles.iconBox, { backgroundColor: colors.accent + '15' }]}>
+                  <Ionicons name="sparkles" size={20} color={colors.accent} />
+                </View>
+                <View>
+                  <Text style={styles.subscriptionTitle}>ClerraAlarm Pro</Text>
+                  <Text style={styles.subscriptionStatus}>
+                    {settings.subscriptionPlan === 'weekly' ? 'Weekly Access' : 'Yearly Access'} • Active
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.promoTitle}>Mega Deal — 76% OFF</Text>
-              <Text style={styles.promoSub}>Only $0.69/week (billed yearly)</Text>
             </View>
-            <Ionicons name="gift" size={42} color="rgba(255,255,255,0.4)" style={styles.promoIcon} />
-            <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
-          </LinearGradient>
-        </TouchableOpacity>
+            <View style={styles.divider} />
+            <SettingsItem 
+              icon="refresh-circle-outline" 
+              title="Restore Purchases" 
+              onPress={() => {
+                Alert.alert('Restore Purchases', 'Searching for active subscriptions...');
+                setTimeout(() => {
+                  Alert.alert('Success', 'Your Pro features have been restored.');
+                  updateSettings({ isPremium: true }); // Mock success
+                }, 1500);
+              }}
+            />
+          </View>
+        </View>
 
         {/* ── Appearance ─────────────────────────────────────────── */}
         <View style={styles.section}>
@@ -256,14 +277,6 @@ export const SettingsScreen: React.FC = () => {
           <Text style={styles.sectionHeader}>ALARM BEHAVIOR</Text>
           <View style={styles.card}>
             <SettingsItem 
-              icon="volume-high" 
-              title="Max Volume Override" 
-              hasSwitch
-              switchValue={settings.maxVolumeOverride}
-              onSwitchChange={(val) => updateSettings({ maxVolumeOverride: val })}
-            />
-            <View style={styles.divider} />
-            <SettingsItem 
               icon="timer" 
               title="Grace Period" 
               value={`${settings.gracePeriod} Sec`} 
@@ -314,65 +327,17 @@ export const SettingsScreen: React.FC = () => {
 
 
         <View style={styles.section}>
-          <Text style={styles.sectionHeader}>ACCOUNT MANAGEMENT</Text>
+          <Text style={styles.sectionHeader}>MAINTENANCE</Text>
           <View style={styles.card}>
             <SettingsItem 
-              icon="log-out-outline" 
-              title="Sign Out" 
-              onPress={handleSignOut} 
-            />
-            <View style={styles.divider} />
-            <SettingsItem 
-              icon="trash-outline" 
-              title="Delete Account" 
+              icon="refresh-outline" 
+              title="Reset All Data" 
               isDestructive
-              onPress={handleDeleteAccount} 
+              onPress={handleResetAllData} 
             />
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>DEVELOPER TOOLS</Text>
-          <View style={styles.card}>
-            <SettingsItem 
-              icon="star" 
-              title="Test Review Prompt" 
-              onPress={() => {
-                Alert.alert(
-                  'Enjoying ClerraAlarm?',
-                  "You've already conquered 2 mornings! Would you mind rating us on the App Store?",
-                  [
-                    { text: 'Maybe Later', style: 'cancel' },
-                    { 
-                      text: 'Rate Us', 
-                      onPress: () => {
-                        const APP_STORE_ID = 'YOUR_APP_ID';
-                        const GOOGLE_PLAY_ID = 'com.clerra.alarm';
-                        const url = Platform.select({
-                          ios: `itms-apps://itunes.apple.com/app/id${APP_STORE_ID}?action=write-review`,
-                          android: `market://details?id=${GOOGLE_PLAY_ID}`,
-                        });
-                        if (url) Linking.openURL(url);
-                      }
-                    }
-                  ]
-                );
-              }}
-            />
-            <View style={styles.divider} />
-            <SettingsItem 
-              icon="color-wand" 
-              title="Re-run Onboarding" 
-              onPress={async () => {
-                await Storage.setHasCompletedOnboarding(false);
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: 'OnboardingWelcome' }],
-                });
-              }}
-            />
-          </View>
-        </View>
 
         <Image 
           source={require('../../assets/ClerraAlarm Light1.png')} 
@@ -617,5 +582,38 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   profileEmail: {
     fontSize: 14,
+  },
+  // Subscription styles
+  subscriptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: colors.surface,
+  },
+  subscriptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  subscriptionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  subscriptionStatus: {
+    fontSize: 13,
+    color: colors.subtext,
+    marginTop: 2,
+  },
+  upgradeBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  upgradeBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
   },
 });

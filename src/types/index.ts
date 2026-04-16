@@ -71,10 +71,10 @@ export interface UserStats {
 export interface AppSettings {
   strictMode: boolean;
   adaptiveDifficulty: boolean;
-  maxVolumeOverride: boolean;
   gracePeriod: number; // 0, 5, 10, 15 (seconds)
   defaultSoundId: string;
   isPremium: boolean;
+  subscriptionPlan?: 'weekly' | 'yearly';
   preAlarmReminder: number; // 0 (None), 5, 10, 15 (minutes)
   hasPromptedForReview: boolean;
 }
