@@ -19,6 +19,15 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import ConfettiCannon from 'react-native-confetti-cannon';
 
+// Safe import — gracefully degrade if native module isn't linked yet
+// (e.g. running against an old dev-client build)
+let VolumeManager: typeof import('react-native-volume-manager').VolumeManager | null = null;
+try {
+  VolumeManager = require('react-native-volume-manager').VolumeManager;
+} catch (_) {
+  console.warn('[VolumeManager] Native module not linked — volume lock disabled.');
+}
+
 type RootStackParamList = {
   Home: undefined;
   CreateAlarm: { alarm?: Alarm };
@@ -91,6 +100,55 @@ export const AlarmRingScreen: React.FC = () => {
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => true);
     return () => backHandler.remove();
+  }, []);
+
+  // ─── Volume lock: prevent user from silencing alarm with volume keys ──────
+  const volumeBeforeLock = useRef<number>(1);
+  const volumeLocked = useRef(true);
+  const [volumeWarning, setVolumeWarning] = useState(false);
+
+  useEffect(() => {
+    let warningTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const lockVolume = async () => {
+      try {
+        // Capture current system volume so we can restore it when alarm is done
+        const result = await VolumeManager?.getVolume();
+        volumeBeforeLock.current = result?.volume ?? 1.0;
+        // Force system volume to max
+        await VolumeManager?.setVolume(1.0, { showUI: false });
+        // Hide the native volume HUD while alarm is ringing
+        VolumeManager?.showNativeVolumeUI({ enabled: false });
+      } catch (_) {}
+    };
+
+    lockVolume();
+
+    // Listen for any volume change while alarm is active
+    const sub = VolumeManager?.addVolumeListener((result) => {
+      if (!volumeLocked.current) return;
+      const vol = typeof result === 'number' ? result : (result as any).volume;
+      if (vol < 1.0) {
+        // User tried to lower volume — slam it back to max and boost software volume
+        VolumeManager?.setVolume(1.0, { showUI: false })?.catch(() => {});
+        if (soundRef.current) {
+          soundRef.current.setStatusAsync({ volume: 1.0 }).catch(() => {});
+        }
+        // Flash a warning message
+        setVolumeWarning(true);
+        if (warningTimer) clearTimeout(warningTimer);
+        warningTimer = setTimeout(() => setVolumeWarning(false), 2000);
+      }
+    });
+
+    return () => {
+      sub?.remove();
+      if (warningTimer) clearTimeout(warningTimer);
+      // Re-enable volume HUD and restore volume when screen unmounts
+      volumeLocked.current = false;
+      VolumeManager?.showNativeVolumeUI({ enabled: true });
+      VolumeManager?.setVolume(volumeBeforeLock.current, { showUI: false })?.catch(() => {});
+    };
   }, []);
 
   // ─── Cleanup on unmount ───────────────────────────────────────────────────
@@ -277,6 +335,10 @@ export const AlarmRingScreen: React.FC = () => {
   const handleComplete = useCallback(async () => {
     const fullyComplete = await completeChallenge();
     if (fullyComplete) {
+      // Release the volume lock before stopping the alarm
+      volumeLocked.current = false;
+      VolumeManager?.showNativeVolumeUI({ enabled: true });
+      VolumeManager?.setVolume(volumeBeforeLock.current, { showUI: false })?.catch(() => {});
       await stopAlarmSound();
       await Notifications.dismissAllNotificationsAsync();
       Vibration.vibrate([0, 100, 100, 100, 100, 100]);
@@ -321,6 +383,35 @@ export const AlarmRingScreen: React.FC = () => {
   };
 
 
+  // ─── Volume warning toast ──────────────────────────────────────────────────
+  const VolumeWarningBanner = volumeWarning ? (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        top: 60,
+        left: 20,
+        right: 20,
+        backgroundColor: 'rgba(233,69,96,0.92)',
+        borderRadius: 14,
+        paddingVertical: 10,
+        paddingHorizontal: 18,
+        flexDirection: 'row',
+        alignItems: 'center',
+        zIndex: 999,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 10,
+      }}
+    >
+      <Ionicons name="volume-high" size={20} color="#fff" style={{ marginRight: 8 }} />
+      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
+        Complete the challenge to control volume!
+      </Text>
+    </Animated.View>
+  ) : null;
+
   // ─── Render: Challenge ────────────────────────────────────────────────────
   if (showChallenge && currentChallenge && phase === 'challenge') {
     const glowColor = glowAnim.interpolate({
@@ -334,6 +425,7 @@ export const AlarmRingScreen: React.FC = () => {
     return (
       <Animated.View style={[styles.screen, { backgroundColor: colors.background }]}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+        {VolumeWarningBanner}
         <SafeAreaView style={styles.flex}>
           {/* Top meta strip mapping to safe area background blending */}
           <View style={[styles.challengeHeader, { backgroundColor: colors.background }]}>
@@ -451,6 +543,7 @@ export const AlarmRingScreen: React.FC = () => {
       <>
         <StatusBar barStyle={hasBg ? 'light-content' : 'dark-content'} backgroundColor={hasBg ? '#000' : '#FEF4EC'} />
         {hasBg && <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />}
+        {VolumeWarningBanner}
 
         <SafeAreaView style={[styles.flex, styles.introInner]}>
           {/* Header info (Top) */}

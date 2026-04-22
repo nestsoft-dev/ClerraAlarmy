@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Alarm, ChallengeType, DayOfWeek } from '../types';
+import { Alarm, ChallengeType } from '../types';
 import { DEFAULT_SOUND_ID } from '../constants/sounds';
 
 interface OnboardingState {
   time: string;
-  repeatDays: DayOfWeek[];
+  repeatDays: number[];
   backgroundId: string;
   soundId: string;
   volume: number;

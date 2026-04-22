@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Alarm, UserStats, Challenge, ChallengeType } from '../types';
+import { Alarm, UserStats, Challenge, ChallengeType, ChallengeDifficulty } from '../types';
 import { Storage, generateId, getTodayDateString } from '../utils/storage';
 import { DEFAULT_SOUND_ID } from '../constants/sounds';
 import * as Notifications from 'expo-notifications';
@@ -11,7 +11,7 @@ interface AlarmContextType {
   stats: UserStats;
   currentAlarmId: string | null;
   currentChallenge: Challenge | null;
-  currentDifficulty: number;
+  currentDifficulty: ChallengeDifficulty;
   failCount: number;
   challengeSequence: Challenge[];
   currentSequenceIndex: number;
@@ -20,7 +20,7 @@ interface AlarmContextType {
   deleteAlarm: (id: string) => Promise<void>;
   toggleAlarm: (id: string) => Promise<void>;
   setCurrentAlarm: (id: string | null) => void;
-  startChallenge: (difficulty?: number, alarmId?: string) => void;
+  startChallenge: (difficulty?: ChallengeDifficulty, alarmId?: string) => void;
   completeChallenge: () => Promise<boolean>;
   failChallenge: () => Promise<void>;
   resetChallenge: () => void;
@@ -42,7 +42,7 @@ export const AlarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   });
   const [currentAlarmId, setCurrentAlarmId] = useState<string | null>(null);
   const [currentChallenge, setCurrentChallenge] = useState<Challenge | null>(null);
-  const [currentDifficulty, setCurrentDifficulty] = useState(1);
+  const [currentDifficulty, setCurrentDifficulty] = useState<ChallengeDifficulty>(1);
   const [failCount, setFailCount] = useState(0);
   const [challengeSequence, setChallengeSequence] = useState<Challenge[]>([]);
   const [currentSequenceIndex, setCurrentSequenceIndex] = useState(0);
@@ -190,7 +190,7 @@ export const AlarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   }, [currentAlarmId]);
 
-  const startChallenge = useCallback((fallbackDifficulty: number = 1, alarmIdOverride?: string) => {
+  const startChallenge = useCallback((fallbackDifficulty: ChallengeDifficulty = 1, alarmIdOverride?: string) => {
     setCurrentDifficulty(fallbackDifficulty);
 
     const resolvedAlarmId = alarmIdOverride ?? currentAlarmId;
@@ -283,7 +283,7 @@ export const AlarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     
     let newDifficulty = currentDifficulty;
     if (settings.adaptiveDifficulty) {
-      newDifficulty = Math.min(3, currentDifficulty + 1);
+      newDifficulty = Math.min(3, currentDifficulty + 1) as ChallengeDifficulty;
     }
     setCurrentDifficulty(newDifficulty as 1 | 2 | 3);
 

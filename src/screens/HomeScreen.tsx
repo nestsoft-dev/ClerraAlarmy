@@ -10,14 +10,7 @@ import { AlarmItem } from '../components/AlarmItem';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSettings } from '../context/SettingsContext';
 import { Platform, Linking } from 'react-native';
-
-type RootStackParamList = {
-  Home: undefined;
-  CreateAlarm: { alarm?: any };
-  AlarmRing: { alarmId: string };
-  Settings: undefined;
-  Scorecard: undefined;
-};
+import { RootStackParamList } from '../navigation/AppNavigator';
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -148,7 +141,7 @@ export const HomeScreen: React.FC = () => {
             
             <TouchableOpacity 
               style={[styles.micBtn, { backgroundColor: colors.accent, shadowColor: colors.accent }]}
-              onPress={() => navigation.navigate('CreateAlarm')}
+              onPress={() => navigation.navigate('CreateAlarm', {})}
               activeOpacity={0.8}
             >
               <Ionicons name="add" size={34} color="#FFF" />

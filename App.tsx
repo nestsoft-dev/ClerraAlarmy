@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { StatusBar, View, useColorScheme } from 'react-native';
 import { AlarmProvider, useAlarm } from './src/context/AlarmContext';
 import * as Notifications from 'expo-notifications';
@@ -17,6 +17,10 @@ import { SOUND_ASSETS } from './src/constants/sounds';
 import { Audio } from 'expo-av';
 import { BUILT_IN_BACKGROUNDS } from './src/constants/backgrounds';
 import * as Font from 'expo-font';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setupAndroidAlarmChannel } from './src/utils/notificationScheduler';
+import { BACKGROUND_NOTIFICATION_TASK } from './index';
+import { Storage } from './src/utils/storage';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -47,25 +51,116 @@ const AppContent: React.FC<{ onReady: () => void }> = ({ onReady }) => {
   const { setCurrentAlarm, startChallenge, currentAlarmId } = useAlarm();
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   const currentAlarmIdRef = useRef(currentAlarmId);
+  // Track whether the navigation container is ready to receive navigations
+  const navigatorReadyRef = useRef(false);
+  // Queue an alarm ID that arrived before the navigator was ready
+  const pendingAlarmIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     currentAlarmIdRef.current = currentAlarmId;
   }, [currentAlarmId]);
 
-  useEffect(() => {
-    const triggerAlarmRing = (alarmId: string) => {
-      // Prevent restarting the challenge if we're already ringing it
-      if (currentAlarmIdRef.current === alarmId) return;
-      
-      setCurrentAlarm(alarmId);
-      startChallenge(1, alarmId);
+  // ── Build a dedup key so the same alarm instance isn't re-triggered ────────
+  const buildDedupKey = (alarmId: string, alarmTime: string) => {
+    const d = new Date();
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return `TRIGGERED_${alarmId}_${alarmTime}_${dateStr}`;
+  };
+
+  const triggerAlarmRing = useCallback(async (alarmId: string) => {
+    // Prevent restarting the challenge if we're already ringing it
+    if (currentAlarmIdRef.current === alarmId) return;
+
+    // Mark this alarm instance as triggered so it isn't re-triggered on next foreground
+    try {
+      const alarms = await Storage.getAlarms();
+      const alarm = alarms.find(a => a.id === alarmId);
+      if (alarm) {
+        await AsyncStorage.setItem(buildDedupKey(alarmId, alarm.time), '1');
+      }
+    } catch (_) {}
+
+    setCurrentAlarm(alarmId);
+    startChallenge(1, alarmId);
+
+    const doNavigate = () => {
       setTimeout(() => {
         navigationRef.current?.navigate('AlarmRing', { alarmId });
-      }, 50); 
+      }, 100);
+    };
+
+    if (navigatorReadyRef.current) {
+      doNavigate();
+    } else {
+      // Navigator not ready yet — queue it and let handleNavigatorReady drain it
+      pendingAlarmIdRef.current = alarmId;
+    }
+  }, [setCurrentAlarm, startChallenge]);
+
+  // Called by AppNavigator once the navigation container is mounted and ready
+  const handleNavigatorReady = useCallback(() => {
+    navigatorReadyRef.current = true;
+    // Drain any alarm that was queued before the navigator was ready
+    if (pendingAlarmIdRef.current) {
+      const pending = pendingAlarmIdRef.current;
+      pendingAlarmIdRef.current = null;
+      setTimeout(() => {
+        navigationRef.current?.navigate('AlarmRing', { alarmId: pending });
+      }, 200);
+    }
+    onReady();
+  }, [onReady]);
+
+  useEffect(() => {
+    // ── Time-based fallback: check if any enabled alarm should currently be ringing
+    // This is the most reliable path when the notification was dismissed or the
+    // background task didn't fire (local notifications on iOS don't wake the BG task).
+    const checkAlarmByTime = async (): Promise<string | null> => {
+      try {
+        const alarms = await Storage.getAlarms();
+        const now = new Date();
+        const todayDay = now.getDay(); // 0 = Sunday
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+
+        for (const alarm of alarms) {
+          if (!alarm.enabled) continue;
+          const [h, m] = alarm.time.split(':').map(Number);
+          const alarmMin = h * 60 + m;
+          const diffMin = nowMin - alarmMin;
+          // Ring if the alarm fired within the last 30 minutes
+          if (diffMin < 0 || diffMin >= 30) continue;
+          // Check it fires today
+          const firesToday =
+            alarm.repeatDays.length === 0 || alarm.repeatDays.includes(todayDay);
+          if (!firesToday) continue;
+          // Skip if we already triggered this exact alarm instance today
+          const already = await AsyncStorage.getItem(buildDedupKey(alarm.id, alarm.time));
+          if (already) continue;
+          return alarm.id;
+        }
+      } catch (e) {
+        console.warn('[TimeCheck] Failed:', e);
+      }
+      return null;
     };
 
     const checkActiveNotifications = async () => {
-      // 1. Try to get response from notification tap first (Cold Start)
+      // 1. Check AsyncStorage for alarm stored by background task (Android / remote push)
+      try {
+        const pendingAlarmId = await AsyncStorage.getItem('PENDING_ALARM_ID');
+        const pendingTs = await AsyncStorage.getItem('PENDING_ALARM_TS');
+        if (pendingAlarmId) {
+          const age = pendingTs ? Date.now() - parseInt(pendingTs, 10) : 0;
+          await AsyncStorage.removeItem('PENDING_ALARM_ID');
+          await AsyncStorage.removeItem('PENDING_ALARM_TS');
+          if (age < 30 * 60 * 1000) {
+            triggerAlarmRing(pendingAlarmId);
+            return;
+          }
+        }
+      } catch (_) {}
+
+      // 2. Notification tapped (cold start)
       const lastResponse = await Notifications.getLastNotificationResponseAsync();
       if (lastResponse) {
         const data = extractAlarmData(lastResponse.notification.request.content.data);
@@ -75,21 +170,27 @@ const AppContent: React.FC<{ onReady: () => void }> = ({ onReady }) => {
         }
       }
 
-      // 2. Check actively ringing notifications in the tray (App icon tap)
+      // 3. Notification still in the tray (warm start / app icon tap)
       const presented = await Notifications.getPresentedNotificationsAsync();
       for (const notification of presented) {
         const data = extractAlarmData(notification.request.content.data);
         if (data?.alarmId && !data.isPreAlarm) {
           triggerAlarmRing(data.alarmId);
-          return; 
+          return;
         }
       }
+
+      // 4. Time-based fallback — most reliable on iOS for local notifications
+      const timeAlarmId = await checkAlarmByTime();
+      if (timeAlarmId) {
+        triggerAlarmRing(timeAlarmId);
+      }
     };
-    
+
     // Check on mount
     checkActiveNotifications();
 
-    // Check whenever app comes to the foreground (Warm start)
+    // Check whenever app comes to the foreground
     const appStateSub = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
         checkActiveNotifications();
@@ -106,7 +207,7 @@ const AppContent: React.FC<{ onReady: () => void }> = ({ onReady }) => {
       }
     );
 
-    // ── Background: notification tapped from notification tray ──────────────
+    // ── Background / killed: notification tapped from tray ──────────────────
     const responseSub = Notifications.addNotificationResponseReceivedListener(
       (response: Notifications.NotificationResponse) => {
         const data = extractAlarmData(response.notification.request.content.data);
@@ -121,9 +222,9 @@ const AppContent: React.FC<{ onReady: () => void }> = ({ onReady }) => {
       receivedSub.remove();
       responseSub.remove();
     };
-  }, []);
+  }, [triggerAlarmRing]);
 
-  return <AppNavigator navigationRef={navigationRef} onReady={onReady} />;
+  return <AppNavigator navigationRef={navigationRef} onReady={handleNavigatorReady} />;
 };
 const ThemedStatusBar: React.FC = () => {
   const { isDark, colors } = useTheme();
@@ -168,7 +269,16 @@ export default function App() {
           shouldDuckAndroid: false,
         });
 
-        await Promise.all([delayPromise, assetPromise, fontPromise, audioModePromise]);
+        // Set up Android alarm notification channel (safe to call every boot)
+        const channelPromise = setupAndroidAlarmChannel();
+
+        // Register background notification task so the app can store the
+        // alarmId when a notification fires while the app is killed/background
+        const taskPromise = Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK).catch(
+          e => console.warn('[Boot] Background task registration failed (Expo Go unsupported):', e)
+        );
+
+        await Promise.all([delayPromise, assetPromise, fontPromise, audioModePromise, channelPromise, taskPromise]);
         console.log('DEBUG: All Assets & Fonts Preloaded.');
       } catch (e) {
         console.warn('DEBUG: Boot Error', e);

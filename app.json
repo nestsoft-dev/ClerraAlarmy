@@ -23,9 +23,14 @@
         "NSMicrophoneUsageDescription": "Microphone is needed to record voice commitments",
         "NSMotionUsageDescription": "Motion sensors are needed for jump, walk, and push-up challenges",
         "UIBackgroundModes": [
-          "audio"
-        ]
-      }
+          "audio",
+          "fetch",
+          "audio",
+          "fetch"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "appleTeamId": "9GPD8X5J7J"
     },
     "android": {
       "adaptiveIcon": {
@@ -45,7 +50,8 @@
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.HIGH_SAMPLING_RATE_SENSORS",
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.USE_FULL_SCREEN_INTENT"
       ]
     },
     "web": {
@@ -85,7 +91,13 @@
       "expo-font",
       "expo-video",
       "expo-asset",
-      "expo-secure-store"
-    ]
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "fd0aa849-5c17-4d53-966b-db4f2e71ae77"
+      }
+    }
   }
 }

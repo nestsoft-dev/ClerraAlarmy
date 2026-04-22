@@ -3,6 +3,27 @@ import * as Device from 'expo-device';
 import { Alarm } from '../types';
 import { ALARM_SOUNDS } from '../constants/sounds';
 import { Storage } from './storage';
+import { Platform } from 'react-native';
+
+export const ALARM_CHANNEL_ID = 'clerra_alarm_channel';
+
+/**
+ * Creates the Android alarm notification channel.
+ * Must be called once at app boot (safe to call multiple times).
+ */
+export const setupAndroidAlarmChannel = async (): Promise<void> => {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync(ALARM_CHANNEL_ID, {
+    name: 'Alarms',
+    importance: Notifications.AndroidImportance.MAX,
+    sound: 'alarm_clock.wav',
+    vibrationPattern: [0, 500, 300, 500, 300, 500],
+    bypassDnd: true,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    enableLights: true,
+    lightColor: '#e94560',
+  });
+};
 
 /**
  * Cancels all scheduled notifications for a given alarm.
@@ -60,6 +81,12 @@ export const scheduleAlarmNotifications = async (alarm: Alarm): Promise<string[]
     sticky: true,
     // Marks this as an alarm-category notification (affects lock screen behavior)
     categoryIdentifier: 'alarm',
+    // Android: use our dedicated high-importance alarm channel
+    ...(Platform.OS === 'android' ? { channelId: ALARM_CHANNEL_ID } : {}),
+    // Android: full-screen intent — launches the app even from locked/killed state
+    ...(Platform.OS === 'android'
+      ? { fullScreenAction: { identifier: Notifications.DEFAULT_ACTION_IDENTIFIER } }
+      : {}),
   };
 
   const preBaseContent: Notifications.NotificationContentInput = {
@@ -144,6 +171,27 @@ export const scheduleAlarmNotifications = async (alarm: Alarm): Promise<string[]
       },
     });
     ids.push(id);
+
+    // ── iOS follow-up notifications ────────────────────────────────────────
+    // iOS notification sounds are capped at ~30 seconds. To keep the alarm
+    // ringing while the app is minimized, schedule follow-up notifications
+    // every 25 seconds for the first 10 minutes.
+    if (Platform.OS === 'ios') {
+      const REPEAT_INTERVAL_MS = 25 * 1000; // 25 seconds
+      const REPEAT_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+      const repeatCount = Math.floor(REPEAT_DURATION_MS / REPEAT_INTERVAL_MS);
+      for (let i = 1; i <= repeatCount; i++) {
+        const repeatTarget = new Date(target.getTime() + i * REPEAT_INTERVAL_MS);
+        const repeatId = await Notifications.scheduleNotificationAsync({
+          content: baseContent,
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: repeatTarget,
+          },
+        });
+        ids.push(repeatId);
+      }
+    }
 
     // Pre-Alarm
     if (preAlarmReminder > 0) {

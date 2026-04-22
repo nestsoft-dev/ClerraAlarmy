@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alarm, AlarmLog, Reflection, UserStats, ChallengeType, ChallengeDifficulty } from '../types';
+import { Alarm, AlarmLog, Reflection, UserStats, ChallengeType, ChallengeDifficulty, AppSettings } from '../types';
 import { DEFAULT_SOUND_ID } from '../constants/sounds';
 
 const KEYS = {
